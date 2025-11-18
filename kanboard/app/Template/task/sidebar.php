@@ -21,6 +21,15 @@
         <li>
             <?= $this->a(t('Edit the task'), 'task', 'edit', array('task_id' => $task['id'], 'project_id' => $task['project_id'])) ?>
         </li>
+        <!-- 
+            CHANGE: Added "Edit recurrence" menu item
+            PURPOSE: Provides access to the recurrence settings panel from the task sidebar
+            LOCATION: Placed after "Edit the task" and before "Edit the description" for logical grouping
+            ACTION: Links to the 'recurrence' action in the Task controller
+        -->
+        <li>
+            <?= $this->a(t('Edit recurrence'), 'task', 'recurrence', array('task_id' => $task['id'], 'project_id' => $task['project_id'])) ?>
+        </li>
         <li>
             <?= $this->a(t('Edit the description'), 'task', 'description', array('task_id' => $task['id'], 'project_id' => $task['project_id'])) ?>
         </li>

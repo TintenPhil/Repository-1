@@ -6,7 +6,36 @@ use PDO;
 use Core\Security;
 use Model\Link;
 
-const VERSION = 66;
+/**
+ * CHANGE: Incremented schema version and added recurrence columns migration
+ * PURPOSE: Adds database columns to store recurrence settings for tasks
+ * 
+ * SCHEMA VERSION: 67 (incremented from 66)
+ * 
+ * COLUMNS ADDED:
+ * - recurrence_status: Stores whether recurrence is enabled (0=none, 1=pending, 2=processed)
+ * - recurrence_trigger: Stores trigger type (0=close, 1=first_column, 2=last_column)
+ * - recurrence_factor: Stores the numeric factor for date calculation (e.g., 4)
+ * - recurrence_timeframe: Stores timeframe unit (0=days, 1=months, 2=years)
+ * - recurrence_basedate: Stores base date option (0=due_date, 1=action_date)
+ * 
+ * DEFAULT VALUES: All columns default to 0 (recurrence disabled)
+ */
+const VERSION = 67;
+
+function version_67($pdo)
+{
+    // Add recurrence status column (0=none, 1=pending, 2=processed)
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_status INT DEFAULT 0");
+    // Add recurrence trigger column (0=close, 1=first_column, 2=last_column)
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_trigger INT DEFAULT 0");
+    // Add recurrence factor column (integer, e.g., 4 for "4 days" or "4 months")
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_factor INT DEFAULT 0");
+    // Add recurrence timeframe column (0=days, 1=months, 2=years)
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_timeframe INT DEFAULT 0");
+    // Add recurrence base date column (0=due_date, 1=action_date)
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_basedate INT DEFAULT 0");
+}
 
 function version_66($pdo)
 {

@@ -71,43 +71,84 @@ class TaskFinder extends Base
 
     /**
      * Extended query
+     * 
+     * CHANGE: Modified to conditionally include recurrence fields based on schema version
+     * PURPOSE: Prevents SQL errors if database hasn't been migrated yet
      *
      * @access public
      * @return \PicoDb\Table
      */
     public function getExtendedQuery()
     {
-        return $this->db
-            ->table(Task::TABLE)
-            ->columns(
-                '(SELECT count(*) FROM '.Comment::TABLE.' WHERE task_id=tasks.id) AS nb_comments',
-                '(SELECT count(*) FROM '.File::TABLE.' WHERE task_id=tasks.id) AS nb_files',
-                '(SELECT count(*) FROM '.Subtask::TABLE.' WHERE '.Subtask::TABLE.'.task_id=tasks.id) AS nb_subtasks',
-                '(SELECT count(*) FROM '.Subtask::TABLE.' WHERE '.Subtask::TABLE.'.task_id=tasks.id AND status=2) AS nb_completed_subtasks',
-                '(SELECT count(*) FROM '.TaskLink::TABLE.' WHERE '.TaskLink::TABLE.'.task_id = tasks.id) AS nb_links',
-                'tasks.id',
-                'tasks.reference',
-                'tasks.title',
-                'tasks.description',
-                'tasks.date_creation',
-                'tasks.date_modification',
-                'tasks.date_completed',
-                'tasks.date_due',
-                'tasks.color_id',
-                'tasks.project_id',
-                'tasks.column_id',
-                'tasks.swimlane_id',
-                'tasks.owner_id',
-                'tasks.creator_id',
-                'tasks.position',
-                'tasks.is_active',
-                'tasks.score',
-                'tasks.category_id',
-                'tasks.date_moved',
-                'users.username AS assignee_username',
-                'users.name AS assignee_name'
-            )
-            ->join(User::TABLE, 'id', 'owner_id');
+        // Check if recurrence columns exist by checking schema version
+        $schema_version = $this->db->getConnection()->getSchemaVersion();
+        $has_recurrence = false;
+        
+        if (DB_DRIVER === 'mysql' && $schema_version >= 67) {
+            $has_recurrence = true;
+        } elseif (DB_DRIVER === 'postgres' && $schema_version >= 48) {
+            $has_recurrence = true;
+        } elseif (DB_DRIVER === 'sqlite' && $schema_version >= 66) {
+            $has_recurrence = true;
+        }
+        
+        // Build base columns list
+        $columns = array(
+            '(SELECT count(*) FROM '.Comment::TABLE.' WHERE task_id=tasks.id) AS nb_comments',
+            '(SELECT count(*) FROM '.File::TABLE.' WHERE task_id=tasks.id) AS nb_files',
+            '(SELECT count(*) FROM '.Subtask::TABLE.' WHERE '.Subtask::TABLE.'.task_id=tasks.id) AS nb_subtasks',
+            '(SELECT count(*) FROM '.Subtask::TABLE.' WHERE '.Subtask::TABLE.'.task_id=tasks.id AND status=2) AS nb_completed_subtasks',
+            '(SELECT count(*) FROM '.TaskLink::TABLE.' WHERE '.TaskLink::TABLE.'.task_id = tasks.id) AS nb_links',
+            'tasks.id',
+            'tasks.reference',
+            'tasks.title',
+            'tasks.description',
+            'tasks.date_creation',
+            'tasks.date_modification',
+            'tasks.date_completed',
+            'tasks.date_due',
+            'tasks.color_id',
+            'tasks.project_id',
+            'tasks.column_id',
+            'tasks.swimlane_id',
+            'tasks.owner_id',
+            'tasks.creator_id',
+            'tasks.position',
+            'tasks.is_active',
+            'tasks.score',
+            'tasks.category_id',
+            'tasks.date_moved',
+        );
+        
+        // Conditionally add recurrence fields if schema supports them
+        if ($has_recurrence) {
+            // CHANGE: Added recurrence fields to extended query
+            // PURPOSE: Ensures recurrence data is available when fetching tasks
+            // USAGE: Needed for RecurringTaskSubscriber to check recurrence status
+            //        when tasks are moved or closed
+            $columns[] = 'tasks.recurrence_status';
+            $columns[] = 'tasks.recurrence_trigger';
+            $columns[] = 'tasks.recurrence_factor';
+            $columns[] = 'tasks.recurrence_timeframe';
+            $columns[] = 'tasks.recurrence_basedate';
+        } else {
+            // Provide default values if columns don't exist
+            $columns[] = '0 AS recurrence_status';
+            $columns[] = '0 AS recurrence_trigger';
+            $columns[] = '0 AS recurrence_factor';
+            $columns[] = '0 AS recurrence_timeframe';
+            $columns[] = '0 AS recurrence_basedate';
+        }
+        
+        $columns[] = 'users.username AS assignee_username';
+        $columns[] = 'users.name AS assignee_name';
+        
+        $table = $this->db->table(Task::TABLE);
+        // CHANGE: Use call_user_func_array because PicoDb\Table::columns() expects variadic params
+        // PURPOSE: Avoid passing a single array (which caused TypeError in escapeIdentifier)
+        call_user_func_array(array($table, 'columns'), $columns);
+        
+        return $table->join(User::TABLE, 'id', 'owner_id');
     }
 
     /**
@@ -221,6 +262,24 @@ class TaskFinder extends Base
      */
     public function getDetails($task_id)
     {
+        // CHANGE: Modified to handle missing recurrence columns gracefully
+        // PURPOSE: Prevents SQL errors if database hasn't been migrated yet
+        // APPROACH: Check schema version to conditionally include recurrence columns
+        
+        // Check if recurrence columns exist by checking schema version
+        // Recurrence was added in: MySQL v67, PostgreSQL v48, SQLite v66
+        $schema_version = $this->db->getConnection()->getSchemaVersion();
+        $has_recurrence = false;
+        
+        if (DB_DRIVER === 'mysql' && $schema_version >= 67) {
+            $has_recurrence = true;
+        } elseif (DB_DRIVER === 'postgres' && $schema_version >= 48) {
+            $has_recurrence = true;
+        } elseif (DB_DRIVER === 'sqlite' && $schema_version >= 66) {
+            $has_recurrence = true;
+        }
+        
+        // Build base SQL query
         $sql = '
             SELECT
             tasks.id,
@@ -244,7 +303,27 @@ class TaskFinder extends Base
             tasks.score,
             tasks.category_id,
             tasks.swimlane_id,
-            tasks.date_moved,
+            tasks.date_moved';
+        
+        // Conditionally add recurrence fields if schema supports them
+        if ($has_recurrence) {
+            $sql .= ',
+            tasks.recurrence_status,
+            tasks.recurrence_trigger,
+            tasks.recurrence_factor,
+            tasks.recurrence_timeframe,
+            tasks.recurrence_basedate';
+        } else {
+            // Provide default values if columns don't exist
+            $sql .= ',
+            0 AS recurrence_status,
+            0 AS recurrence_trigger,
+            0 AS recurrence_factor,
+            0 AS recurrence_timeframe,
+            0 AS recurrence_basedate';
+        }
+        
+        $sql .= ',
             project_has_categories.name AS category_name,
             projects.name AS project_name,
             columns.title AS column_title,
@@ -262,7 +341,18 @@ class TaskFinder extends Base
         ';
 
         $rq = $this->db->execute($sql, array($task_id));
-        return $rq->fetch(PDO::FETCH_ASSOC);
+        $result = $rq->fetch(PDO::FETCH_ASSOC);
+        
+        // Ensure recurrence fields exist in result even if columns don't
+        if ($result && !$has_recurrence) {
+            $result['recurrence_status'] = 0;
+            $result['recurrence_trigger'] = 0;
+            $result['recurrence_factor'] = 0;
+            $result['recurrence_timeframe'] = 0;
+            $result['recurrence_basedate'] = 0;
+        }
+        
+        return $result;
     }
 
     /**

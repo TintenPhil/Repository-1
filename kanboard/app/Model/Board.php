@@ -315,6 +315,21 @@ class Board extends Base
     }
 
     /**
+     * Get the last column id for a given project
+     *
+     * CHANGE: Added helper for recurrence triggers
+     * PURPOSE: Needed by RecurringTaskSubscriber to detect moves to last column
+     *
+     * @access public
+     * @param  integer  $project_id   Project id
+     * @return integer
+     */
+    public function getLastColumn($project_id)
+    {
+        return $this->db->table(self::TABLE)->eq('project_id', $project_id)->desc('position')->findOneColumn('id');
+    }
+
+    /**
      * Get the list of columns sorted by position [ column_id => title ]
      *
      * @access public

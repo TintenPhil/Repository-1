@@ -135,9 +135,29 @@ class TaskPosition extends Base
      * @param  integer   $new_position
      * @param  integer   $new_swimlane_id
      */
+    /**
+     * Fire events when task position changes
+     * 
+     * CHANGE: Modified to include full task data with recurrence fields
+     * PURPOSE: Ensures RecurringTaskSubscriber has access to recurrence settings
+     * 
+     * WHY: When a task is moved between columns, the RecurringTaskSubscriber needs
+     *      to check if recurrence is enabled and if the move matches the trigger.
+     *      Without recurrence fields in the event, the subscriber can't determine
+     *      if a new recurring task should be generated.
+     * 
+     * BEFORE: Only included specific fields (task_id, column_id, etc.)
+     * AFTER: Includes full task data from database (including recurrence fields)
+     */
     private function fireEvents(array $task, $new_column_id, $new_position, $new_swimlane_id)
     {
-        $event_data = array(
+        // Get full task data including recurrence fields from database
+        // This ensures the event contains all necessary data for subscribers
+        $full_task = $this->taskFinder->getById($task['id']);
+        
+        // Merge full task data with position change data
+        // Full task data includes recurrence settings needed by RecurringTaskSubscriber
+        $event_data = array_merge($full_task ?: $task, array(
             'task_id' => $task['id'],
             'project_id' => $task['project_id'],
             'position' => $new_position,
@@ -146,7 +166,7 @@ class TaskPosition extends Base
             'src_column_id' => $task['column_id'],
             'dst_column_id' => $new_column_id,
             'date_moved' => $task['date_moved'],
-        );
+        ));
 
         if ($task['swimlane_id'] != $new_swimlane_id) {
             $this->container['dispatcher']->dispatch(Task::EVENT_MOVE_SWIMLANE, new TaskEvent($event_data));

@@ -6,7 +6,25 @@ use PDO;
 use Core\Security;
 use Model\Link;
 
-const VERSION = 47;
+/**
+ * CHANGE: Incremented schema version and added recurrence columns migration for PostgreSQL
+ * PURPOSE: Adds database columns to store recurrence settings for tasks
+ * 
+ * SCHEMA VERSION: 48 (incremented from 47)
+ * 
+ * NOTE: Same structure as MySQL version, but uses INTEGER type (PostgreSQL syntax)
+ */
+const VERSION = 48;
+
+function version_48($pdo)
+{
+    // Add recurrence columns (same as MySQL, using INTEGER type for PostgreSQL)
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_status INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_trigger INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_factor INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_timeframe INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_basedate INTEGER DEFAULT 0");
+}
 
 function version_47($pdo)
 {

@@ -58,6 +58,12 @@ class TaskModification extends Base
 
     /**
      * Prepare data before task modification
+     * 
+     * CHANGE: Added recurrence fields to convertIntegerFields call
+     * PURPOSE: Ensures recurrence fields are properly converted to integers before saving
+     * 
+     * WHY: Recurrence fields come from form submissions as strings, but need to be stored
+     *      as integers in the database. This conversion ensures data integrity.
      *
      * @access public
      * @param  array    $values    Form values
@@ -67,7 +73,9 @@ class TaskModification extends Base
         $this->dateParser->convert($values, array('date_due', 'date_started'));
         $this->removeFields($values, array('another_task', 'id'));
         $this->resetFields($values, array('date_due', 'date_started', 'score', 'category_id', 'time_estimated', 'time_spent'));
-        $this->convertIntegerFields($values, array('is_active'));
+        // Convert recurrence fields to integers (they come from form as strings)
+        // This ensures proper data type for database storage
+        $this->convertIntegerFields($values, array('is_active', 'recurrence_status', 'recurrence_trigger', 'recurrence_factor', 'recurrence_timeframe', 'recurrence_basedate'));
 
         $values['date_modification'] = time();
     }

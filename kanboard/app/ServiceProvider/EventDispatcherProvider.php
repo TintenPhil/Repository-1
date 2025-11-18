@@ -8,6 +8,9 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Subscriber\AuthSubscriber;
 use Subscriber\BootstrapSubscriber;
 use Subscriber\NotificationSubscriber;
+// CHANGE: Added recurring task subscriber
+// PURPOSE: Listens for task close/move events to generate recurring tasks
+use Subscriber\RecurringTaskSubscriber;
 use Subscriber\ProjectActivitySubscriber;
 use Subscriber\ProjectDailySummarySubscriber;
 use Subscriber\ProjectModificationDateSubscriber;
@@ -31,6 +34,8 @@ class EventDispatcherProvider implements ServiceProviderInterface
         $container['dispatcher']->addSubscriber(new SubtaskTimesheetSubscriber($container));
         $container['dispatcher']->addSubscriber(new TaskMovedDateSubscriber($container));
         $container['dispatcher']->addSubscriber(new TransitionSubscriber($container));
+        // CHANGE: Register RecurringTaskSubscriber to enable recurring task automation
+        $container['dispatcher']->addSubscriber(new RecurringTaskSubscriber($container));
 
         // Automatic actions
         $container['action']->attachEvents();

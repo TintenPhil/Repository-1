@@ -3,6 +3,10 @@
 namespace Controller;
 
 use Model\Project as ProjectModel;
+// CHANGE: Added Task model import with alias to avoid naming conflict
+// PURPOSE: Needed to reference Task constants (RECURRING_STATUS_*, etc.) in the recurrence() method
+// NOTE: Using alias TaskModel because the controller class is also named Task
+use Model\Task as TaskModel;
 
 /**
  * Task controller
@@ -519,6 +523,128 @@ class Task extends Base
             'task' => $task,
             'projects_list' => $projects_list,
         )));
+    }
+
+    /**
+     * Edit recurrence settings
+     * 
+     * CHANGE: Added new controller method to handle recurrence settings
+     * PURPOSE: Displays the recurrence settings form and processes form submissions
+     * 
+     * FLOW:
+     * 1. GET request: Display the form with current recurrence settings (or defaults)
+     * 2. POST request: Process form submission, validate, and save settings
+     * 
+     * FEATURES:
+     * - Supports both AJAX and full page rendering
+     * - Maps "Yes"/"No" dropdown to recurrence status constants
+     * - Sets default values when "Yes" is selected
+     * - Clears all recurrence fields when "No" is selected
+     * - Provides dropdown lists for all recurrence options
+     *
+     * @access public
+     */
+    public function recurrence()
+    {
+        $task = $this->getTask();
+        // Support both AJAX requests and regular page requests
+        $ajax = $this->request->isAjax() || $this->request->getIntegerParam('ajax');
+
+        // Handle form submission (POST request)
+        if ($this->request->isPost()) {
+
+            $values = $this->request->getValues();
+
+            // Map "Yes"/"No" dropdown selection to recurrence status constants
+            // The form shows "Yes"/"No" but we store as constants (0 = No, 1 = Yes)
+            if (isset($values['recurrence_status'])) {
+                if ($values['recurrence_status'] == TaskModel::RECURRING_STATUS_PENDING) {
+                    // If "Yes" is selected, ensure other required fields have default values
+                    // This prevents incomplete recurrence configurations
+                    if (empty($values['recurrence_trigger'])) {
+                        $values['recurrence_trigger'] = TaskModel::RECURRING_TRIGGER_CLOSE;
+                    }
+                    if (empty($values['recurrence_factor'])) {
+                        $values['recurrence_factor'] = 1;
+                    }
+                    if (!isset($values['recurrence_timeframe'])) {
+                        $values['recurrence_timeframe'] = TaskModel::RECURRING_TIMEFRAME_DAYS;
+                    }
+                    if (!isset($values['recurrence_basedate'])) {
+                        $values['recurrence_basedate'] = TaskModel::RECURRING_BASEDATE_DUE_DATE;
+                    }
+                } else {
+                    // If "No" is selected, clear all recurrence fields to disable recurrence
+                    // This ensures a clean state when recurrence is turned off
+                    $values['recurrence_status'] = TaskModel::RECURRING_STATUS_NONE;
+                    $values['recurrence_trigger'] = 0;
+                    $values['recurrence_factor'] = 0;
+                    $values['recurrence_timeframe'] = 0;
+                    $values['recurrence_basedate'] = 0;
+                }
+            }
+
+            // Save the recurrence settings using TaskModification model
+            if ($this->taskModification->update($values)) {
+                $this->session->flash(t('Recurrence settings updated successfully.'));
+            }
+            else {
+                $this->session->flashError(t('Unable to update recurrence settings.'));
+            }
+
+            // Redirect based on request type (AJAX goes to board, regular goes to task view)
+            if ($ajax) {
+                $this->response->redirect('?controller=board&action=show&project_id='.$task['project_id']);
+            }
+            else {
+                $this->response->redirect('?controller=task&action=show&task_id='.$task['id'].'&project_id='.$task['project_id']);
+            }
+        }
+        // Handle form display (GET request)
+        else {
+            // Load current task data as form values
+            $values = $task;
+            $errors = array();
+        }
+
+        // Ensure default values if recurrence fields are not set in the database
+        // This handles cases where tasks were created before recurrence feature existed
+        if (!isset($values['recurrence_status']) || $values['recurrence_status'] == '') {
+            $values['recurrence_status'] = TaskModel::RECURRING_STATUS_NONE;
+        }
+        if (!isset($values['recurrence_trigger'])) {
+            $values['recurrence_trigger'] = TaskModel::RECURRING_TRIGGER_CLOSE;
+        }
+        if (!isset($values['recurrence_factor'])) {
+            $values['recurrence_factor'] = 0;
+        }
+        if (!isset($values['recurrence_timeframe'])) {
+            $values['recurrence_timeframe'] = TaskModel::RECURRING_TIMEFRAME_DAYS;
+        }
+        if (!isset($values['recurrence_basedate'])) {
+            $values['recurrence_basedate'] = TaskModel::RECURRING_BASEDATE_DUE_DATE;
+        }
+
+        // Prepare template parameters
+        // Include all dropdown lists needed for the form
+        $params = array(
+            'values' => $values,
+            'errors' => $errors,
+            'task' => $task,
+            'ajax' => $ajax,
+            'recurrence_status_list' => $this->task->getRecurrenceStatusList(),
+            'recurrence_trigger_list' => $this->task->getRecurrenceTriggerList(),
+            'recurrence_timeframe_list' => $this->task->getRecurrenceTimeframeList(),
+            'recurrence_basedate_list' => $this->task->getRecurrenceBasedateList(),
+        );
+
+        // Render the form (AJAX or full page)
+        if ($ajax) {
+            $this->response->html($this->template->render('task/edit_recurrence', $params));
+        }
+        else {
+            $this->response->html($this->taskLayout('task/edit_recurrence', $params));
+        }
     }
 
     /**

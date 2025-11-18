@@ -321,7 +321,7 @@ class Helper
 
         $html = '<textarea name="'.$name.'" id="form-'.$name.'" class="'.$class.'" ';
         $html .= implode(' ', $attributes).'>';
-        $html .= isset($values->$name) ? $this->e($values->$name) : isset($values[$name]) ? $values[$name] : '';
+        $html .= isset($values->$name) ? $this->helper->e($values->$name) : (isset($values[$name]) ? $values[$name] : '');
         $html .= '</textarea>';
         $html .= $this->errorList($errors, $name);
 

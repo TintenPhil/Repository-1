@@ -249,7 +249,7 @@ class ProjectActivity extends Base
      */
     public function decode($data)
     {
-        if ($data{0} === 'a') {
+        if ($data[0] === 'a') {
             return unserialize($data);
         }
 

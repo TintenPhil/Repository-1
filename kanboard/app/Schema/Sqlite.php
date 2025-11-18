@@ -6,7 +6,25 @@ use Core\Security;
 use PDO;
 use Model\Link;
 
-const VERSION = 65;
+/**
+ * CHANGE: Incremented schema version and added recurrence columns migration for SQLite
+ * PURPOSE: Adds database columns to store recurrence settings for tasks
+ * 
+ * SCHEMA VERSION: 66 (incremented from 65)
+ * 
+ * NOTE: Same structure as MySQL/PostgreSQL versions, using INTEGER type (SQLite syntax)
+ */
+const VERSION = 66;
+
+function version_66($pdo)
+{
+    // Add recurrence columns (same as MySQL/PostgreSQL, using INTEGER type for SQLite)
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_status INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_trigger INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_factor INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_timeframe INTEGER DEFAULT 0");
+    $pdo->exec("ALTER TABLE tasks ADD COLUMN recurrence_basedate INTEGER DEFAULT 0");
+}
 
 function version_65($pdo)
 {

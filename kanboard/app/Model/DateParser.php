@@ -105,11 +105,29 @@ class DateParser extends Base
      */
     public function getDateFormats()
     {
-        return array(
-            $this->config->get('application_date_format', 'm/d/Y'),
-            'Y-m-d',
-            'Y_m_d',
+        $configuredFormat = $this->config->get('application_date_format', 'm/d/Y');
+
+        $formats = array($configuredFormat);
+
+        $separators = array('/', '-', '.', ' ');
+
+        $orders = array(
+            array('Y', 'm', 'd'),
+            array('Y', 'd', 'm'),
+            array('m', 'd', 'Y'),
+            array('d', 'm', 'Y'),
+            array('m', 'Y', 'd'),
+            array('d', 'Y', 'm'),
         );
+
+        foreach ($orders as $order) {
+            foreach ($separators as $separator) {
+                $formats[] = implode($separator, $order);
+            }
+            $formats[] = implode('', $order);
+        }
+
+        return array_values(array_unique(array_filter($formats)));
     }
 
     /**

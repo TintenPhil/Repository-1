@@ -18,11 +18,18 @@ class Date extends Base
     public function execute(array $data)
     {
         if (isset($data[$this->field]) && $data[$this->field] !== '') {
+            $value = trim($data[$this->field]);
 
             foreach ($this->formats as $format) {
-                if ($this->isValidDate($data[$this->field], $format) === true) {
+                if ($this->isValidDate($value, $format) === true) {
                     return true;
                 }
+            }
+
+            $timestamp = strtotime($value);
+
+            if ($timestamp !== false && $timestamp > 0) {
+                return true;
             }
 
             return false;
@@ -37,9 +44,9 @@ class Date extends Base
 
         if ($date !== false) {
             $errors = DateTime::getLastErrors();
-            if ($errors['error_count'] === 0 && $errors['warning_count'] === 0) {
+            if (is_array($errors) && $errors['error_count'] === 0 && $errors['warning_count'] === 0) {
                 $timestamp = $date->getTimestamp();
-                return $timestamp > 0 ? true : false;
+                return $timestamp > 0;
             }
         }
 
